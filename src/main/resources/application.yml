@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/carsellingsys?serverTimezone=UTC
+    username: root
+    password: 123456
+
+server:
+  tomcat:
+    max-connections: 8192
+    connection-timeout: 20000
+    threads:
+      max: 500
+      min-spare: 20
+
+logging:
+  level:
+    com.example.new_sp.dao: debug
+mybatis-plus:
+  global-config:
+    db-config:
+      id-type: auto #id生成规则：数据库id自增
+

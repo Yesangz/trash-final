@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="static/axios.js"></script>
+
+    <!--    https://unpkg.com/element-ui/lib/theme-chalk/index.css-->
+    <link rel="stylesheet" href="static/element_index.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+
+    <!-- 必须先引入vue，  后使用element-ui -->
+    <script src="static/vue.js"></script>
+    <!-- 引入element 的组件库-->
+
+    <!--  <script src="https://unpkg.com/element-ui/lib/index.js"></script>-->
+    <script src="static/Element_Index.js"></script>
+    <title>汽车销售系统</title>
+
+    <style>
+        .el-header {
+            background-color: lightblue;
+            color: #333;
+            line-height: 60px;
+
+        }
+
+        .el-aside {
+            color: #333;
+
+        }
+        h1{
+            text-align:center;
+
+        }
+        .el-link{
+            width: 200px;
+            height: 100px;
+            background: #B3C0D1;
+        }
+
+    </style>
+</head>
+
+<body>
+<div id="box">
+    <el-container style="height:900px; border: 1px solid #eee">
+<!--        左边导航-->
+        <el-aside width="200px" style="background-color: rgb(238, 241, 246)">
+            <el-menu
+                    default-active="2"
+                    class="el-menu-vertical-demo"
+                    @open="handleOpen"
+                    @close="handleClose"
+                    background-color="#545c64"
+                    text-color="#fff"
+                    active-text-color="#ffd04b">
+                <el-submenu index="1" >
+                    <template slot="title">
+                        <i class="el-icon-user-solid"></i>
+                        <span>账户信息</span>
+                    </template>
+                    <el-menu-item-group>
+                        <el-menu-item index="1-1" @click="delayChangeForm()">
+                            <i class="el-icon-notebook-2"></i>
+                            <span>信息修改</span>
+                        </el-menu-item>
+                    </el-menu-item-group>
+                </el-submenu>
+
+                <el-submenu>
+                    <template slot="title" index="2">
+                        <i class="el-icon-s-goods"></i>
+                        <span>车辆</span>
+                    </template>
+                    <el-menu-item-group>
+                        <el-menu-item index="1" @click="changeForm('./carSelect.html')">
+                            <i class="el-icon-menu"></i>
+                            <span slot="title">车辆信息</span>
+                        </el-menu-item>
+                        <el-menu-item index="2" @click="checkBrandManageAuthority" :disabled="BrandManageDisable">
+                            <i class="el-icon-plus"></i>
+                            <span slot="title">汽车品牌管理</span>
+                        </el-menu-item>
+                    </el-menu-item-group>
+                </el-submenu>
+                <el-menu-item index="3" @click="changeForm('./orderManage.html')">
+                    <i class="el-icon-document"></i>
+                    <span slot="title">订单管理</span>
+                </el-menu-item>
+                <el-menu-item index="4" @click="feedbackJudgeType">
+                    <i class="el-icon-setting"></i>
+                    <span slot="title">意见反馈</span>
+                </el-menu-item>
+            </el-menu>
+        </el-aside>
+
+<!--        车辆品牌管理表-->
+        <el-dialog
+                title="车辆品牌管理"
+                :visible.sync="BrandManagementVisible"
+                width="40%"
+        >
+            <el-form>
+                <el-form-item label="汽车品牌">
+                    <el-select v-model="Brand"
+                               value-key="brandID"
+                               filterable clearable placeholder="请选择"
+                               @visible-change="selectBrands($event)"
+                               ref="delBrandValue"
+                    >
+                        <el-option
+                                v-for="item in Brands"
+                                :key="item.brandID"
+                                :label="item.brandName"
+                                :value="item.brandID">
+                        </el-option>
+                    </el-select>
+
+                    <el-button @click="dropWarnVisible = true" type="danger" round>删除该品牌</el-button>
+
+                </el-form-item>
+                <el-form-item>
+                    <el-button @click="BrandFormVisible = true" type="primary">添加品牌</el-button>
+                    <el-button @click="BrandManagementVisible = false">取消</el-button>
+                </el-form-item>
+            </el-form>
+        </el-dialog>
+
+<!--        品牌删除提示框-->
+        <el-dialog
+                title="警告"
+                :visible.sync="dropWarnVisible"
+                width="30%"
+        >
+            <span>是否确认删除该品牌？</span><br><br>
+            <el-button @click="dropBrand" type="danger">确定</el-button>
+            <el-button @click="dropWarnVisible = false">取消</el-button>
+        </el-dialog>
+
+<!--        车辆品牌添加表-->
+        <el-dialog
+                title="车辆品牌添加"
+                :visible.sync="BrandFormVisible"
+                width="20%"
+        >
+            <el-form>
+                <el-form-item label="车辆品牌名称">
+                    <el-input v-model="BrandName" placeholder="品牌名称"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button @click="ConfirmAdd" type="primary">添加</el-button>
+                    <el-button @click="BrandFormVisible = false">取消</el-button>
+                </el-form-item>
+            </el-form>
+        </el-dialog>
+
+
+<!--    意见反馈表单    -->
+        <el-dialog
+                title="建议"
+                :visible.sync="feedbackVisible"
+                width="30%"
+        >
+            <el-form label-width="100px">
+                <el-form-item>
+                    <el-input
+                            :rows="5"
+                            placeholder="请输入内容"
+                            v-model="feedbackContent">
+                    </el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="feedbackSubmit">提交</el-button>
+                    <el-button @click="feedbackVisible = false">取消</el-button>
+                </el-form-item>
+            </el-form>
+        </el-dialog>
+
+        <el-container>
+
+            <el-header style="text-align:right; font-size: 12px;">
+                <span>欢迎</span>
+                {{accountType}}
+                <span>用户&nbsp;</span>
+                {{accountName}}
+                <el-dropdown @command="dispatchCommand">
+                    <el-button class="el-icon-switch-button" style="margin-right: 15px"></el-button>
+                    <el-dropdown-menu slot="dropdown">
+                        <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                    </el-dropdown-menu>
+                </el-dropdown>
+            </el-header>
+
+            <!--     动态显示内容       -->
+            <div id="myIframeContainer">
+                <iframe :src="fromForChange" height="800px" width="100%"></iframe>
+            </div>
+            </iframe>
+        </el-container>
+    </el-container>
+</div>
+</body>
+<script>
+    new Vue({
+        el: '#box',
+        mounted(){
+            // 前端权限判断，因为前端的权限判断是可以绕过的，所以不仅前端，后端的每个功能也添加了一层权限检查
+            axios.get("/Account").then((resp)=>{
+                this.accountType = resp.data.data.Type
+                this.accountName = resp.data.data.AccountName
+                if(this.accountType == 'Customer'){
+                    this.BrandManageDisable=true;
+                }else if (this.accountType == 'Salesperson'){
+                    this.BrandManageDisable=true;
+                }else if(this.accountType == 'Admin' || this.accountType=='Supplier'){
+                    this.BrandManageDisable=false;
+                }
+            })
+        },
+        data() {
+            return {
+                //意见反馈模块
+                feedbackContent:'',
+                feedbackVisible:false,
+
+                //品牌管理模块
+                dropWarnVisible:false,
+                BrandManagementVisible:false,
+                BrandFormVisible:false,
+
+                BrandManageDisable: true,
+                Brand:null,//用于品牌管理中，保存品牌选择的值
+                BrandName:'',//用于添加品牌
+                accountName:'',
+                MessagePage:'',
+                accountType:'',
+                fromForChange:"./carSelect.html",
+                msg:'',
+                // 以下都为表单和数组
+                Brands:[{//存储品牌数据
+                    brandID:0,
+                    brandName:'奔驰'
+                }],
+            }
+        },
+        methods:{
+            //提交意见反馈
+            feedbackSubmit(){
+                axios.post("/feedback", {
+                    content:this.feedbackContent
+                }).then((resp)=>{
+                    if(resp.data.code == 20011){
+                        this.$message({
+                            message:resp.data.msg,
+                            type:'success'
+                        })
+                        this.feedbackVisible=false;
+                    }else {
+                        this.$message.error(resp.data.msg);
+                    }
+                })
+            },
+            //意见反馈根据账户类型给与不同界面
+            feedbackJudgeType(){
+                if(this.accountType == 'Customer' || this.accountType == 'Salesperson'){
+                    this.feedbackVisible=true;
+                }else if(this.accountType == 'Admin' || this.accountType=='Supplier'){
+                    this.changeForm('./feedback.html')
+                }
+            },
+            //品牌管理的第二层权限检查
+            checkBrandManageAuthority(){
+                if(this.accountType == 'Supplier' || this.accountType == 'Admin'){
+                    this.BrandManagementVisible = true;
+                }
+                else {
+                    this.$message.error("该用户类型不支持此操作");
+                }
+            },
+            dropBrand(){//删除品牌
+                if (this.Brand == null){
+                    this.$message.error("请选择品牌");
+                }else {
+                    axios.post("/Brands/drop",
+                        {
+                            brandID:this.Brand
+                        }).then((resp)=>{
+                        if(resp.data.code==20021){
+                            this.$message({
+                                message: resp.data.msg,
+                                type:'success'
+                            });
+                        }else {
+                            if(resp.data.msg=='参数为空'){
+                                this.$message.error('请选择品牌');
+                            }
+                            this.$message.error(resp.data.msg);
+                        }
+                        this.dropWarnVisible=false;
+                        this.Brand=null;
+                    })
+                }
+            },
+            selectBrands(callback){//获得品牌
+                if(callback){
+                    axios.get("/Car/getBrands").then((resp)=>{
+                        // const data = JSON.stringify(resp.data.data);
+                        this.Brands = resp.data.data
+                    })
+                }
+            },
+            ConfirmAdd(){//确认添加品牌
+                axios.post("/Brands",{
+                    BrandName:this.BrandName
+                }).then((resp)=>{
+                    if(resp.data.code==20011){
+                        this.$message({
+                            message: resp.data.msg,
+                            type:'success'
+                        });
+                    }else {
+                        this.$message.error(resp.data.msg);
+                    }
+                    this.BrandFormVisible=false;
+                })
+            },
+            // 退出登录，通过session，因此不需要传数据
+            logout(){
+                axios.post("/Account/logout").then((resp)=>{
+                    this.$message.error(resp.data.msg)
+                    location.reload()
+                })
+            },
+            // 根据点击dropdown的command，来实现分发执行函数
+            dispatchCommand(command){
+                if(command =='logout'){
+                    this.logout();
+                }
+            },
+            // 针对不同账号跳转的信息设置
+            delayChangeForm(){
+                if(this.accountType=='Customer'){
+                    this.MessagePage='./customerMessage.html'
+                }else if(this.accountType=='Salesperson'){
+                    this.MessagePage='./SalespersonMessage.html'
+                }else {
+                    this.$message.error("该用户类型不支持此操作")
+                }
+                this.fromForChange = this.MessagePage;
+                this.$forceUpdate();
+            },
+            // 强制改变表单内容
+            changeForm(val){
+                this.fromForChange = val;
+                this.$forceUpdate();
+            },
+            // 导航界面menu-item的展开与关闭
+            handleOpen(key, keyPath) {
+                console.log(key, keyPath);
+            },
+            handleClose(key, keyPath) {
+                console.log(key, keyPath);
+            }
+        }
+    })
+</script>
+</html>

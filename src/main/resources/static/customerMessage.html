@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="static/axios.js"></script>
+
+    <!--    https://unpkg.com/element-ui/lib/theme-chalk/index.css-->
+    <link rel="stylesheet" href="static/element_index.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+
+    <!-- 必须先引入vue，  后使用element-ui -->
+    <script src="static/vue.js"></script>
+    <!-- 引入element 的组件库-->
+
+    <!--  <script src="https://unpkg.com/element-ui/lib/index.js"></script>-->
+    <script src="static/Element_Index.js"></script>
+    <title>accountMessage</title>
+</head>
+<body>
+<div id="accountDetail">
+    <el-form :model="ruleForm" :rules="rules" ref="ruleForm" label-width="100px" class="demo-ruleForm">
+        <el-form-item label="姓名" prop="Name">
+            <el-input type="text" v-model="ruleForm.Name" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="电话" prop="Phone">
+            <el-input type="text" v-model="ruleForm.Phone" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="邮箱" prop="Email">
+            <el-input type="text" v-model="ruleForm.Email" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="地址" prop="Address">
+            <el-input type="text" v-model="ruleForm.Address" autocomplete="off"></el-input>
+        </el-form-item>
+
+        <el-form-item>
+            <el-button type="primary" @click="Submit">提交</el-button>
+            <el-button @click="ChangePassVisible = true">修改密码</el-button>
+        </el-form-item>
+    </el-form>
+
+    <el-dialog
+            title="修改密码"
+            :visible.sync="ChangePassVisible"
+            width="30%"
+    >
+        <el-form :model="PassForm" status-icon :rules="PassRules" ref="PassForm" label-width="100px" >
+            <el-form-item label="密码" prop="Pass">
+                <el-input type="password" v-model="PassForm.Pass" autocomplete="off"></el-input>
+            </el-form-item>
+            <el-form-item label="确认密码" prop="checkPass">
+                <el-input type="password" v-model="PassForm.checkPass" autocomplete="off"></el-input>
+            </el-form-item>
+
+            <el-form-item>
+                <el-button type="primary" @click="PassSubmit">提交</el-button>
+                <el-button @click="ChangePassVisible = false">取消</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+</div>
+<script>
+    new Vue({
+        el:'#accountDetail',
+        mounted(){
+            axios.get("/Customer").then((resp)=>{
+                this.ruleForm.AccountID=resp.data.data.AccountID
+                this.ruleForm.CustomerID=resp.data.data.CustomerID
+                this.ruleForm.Name = resp.data.data.Name
+                this.ruleForm.Phone = resp.data.data.Phone
+                this.ruleForm.Email = resp.data.data.Email
+                this.ruleForm.Address = resp.data.data.Address
+            })
+        },
+        data(){
+            var validateRealName=(rule, value ,callback) => {//通用的名字检查非空
+                if(value === ''){
+                    callback(new Error('请输入姓名'));
+                }
+                callback()
+            }
+            var validateAddress=(rule, value ,callback) => {
+                if(value === ''){
+                    callback(new Error('请输入地址'));
+                }
+                callback()
+            }
+            var validateEmail=(rule, value ,callback) => {
+                const reg2 =  /^([a-zA-Z0-9]+[|-|.]?)*[a-zA-Z0-9]+@([a-zA-Z0-9]+[|-|.]?)*[a-zA-Z0-9]+(.[a-zA-Z]{2,3})+$/;
+                if(value === ''){
+                    callback(new Error('请输入邮箱'))
+                }else if (!reg2.test(value)){
+                    callback(new Error('无效的邮箱'))
+                }
+                callback()
+            }
+            var validatePhone=(rule, value ,callback) => {
+                const reg2 =  /^1(3[0-9]|4[57]|5[0-35-9]|7[0678]|8[0-9])\d{8}$/;
+                if(value === ''){
+                    callback(new Error('请输入手机号码'))
+                }else if (!reg2.test(value)){
+                    callback(new Error('无效的号码'))
+                }
+                callback()
+            }
+            var validatePass = (rule, value, callback) => {
+                if (value === '') {
+                    callback(new Error('请输入密码'));
+                } else {
+                    if (this.PassForm.checkPass !== '') {
+                        this.$refs.PassForm.validateField('checkPass');
+                    }
+                    callback();
+                }
+            };
+            var validatePass2 = (rule, value, callback) => {
+                if (value === '') {
+                    callback(new Error('请再次输入密码'));
+                } else if (value !== this.PassForm.Pass) {
+                    callback(new Error('两次输入密码不一致!'));
+                } else {
+                    callback();
+                }
+            };
+            return{
+                PassForm:{
+                  AccountID:'',
+                  Pass:'',
+                  checkPass:''
+                },
+                ChangePassVisible: false,
+                rules:{
+                    Phone:[
+                        {validator: validatePhone, trigger: 'blur'}
+                    ],
+                    Email:[
+                        {validator: validateEmail, trigger: 'blur'}
+                    ],
+                    Address:[
+                        {validator: validateAddress, trigger: 'blur'}
+                    ],
+                    Name:[
+                        {validator: validateRealName, trigger: 'blur'}
+                    ]
+                },
+                ruleForm: {
+                    AccountID:'',
+                    CustomerID:'',
+                    AccountName: '',
+                    Name:'',
+                    Phone:'',
+                    Email:'',
+                    Address:'',
+                },
+                PassRules :{
+                    Pass: [
+                        {validator: validatePass, trigger: 'blur'}
+                    ],
+                    checkPass: [
+                        {validator: validatePass2, trigger: 'blur'}
+                    ]
+                }
+            }
+        },
+        methods:{
+            PassSubmit(){
+                this.$refs.PassForm.validate((valid)=> {
+                    if (valid) {
+                        this.PassForm.AccountID = this.ruleForm.AccountID
+                        axios.post("/Account/update",this.PassForm).then((resp)=>{
+                            this.ChangePassVisible=false;
+                            this.$message({
+                                message: resp.data.msg,
+                                type: 'success'
+                            });
+                        })
+                    }else {
+                        return false;
+                    }
+                })
+
+            },
+            Submit(){
+                this.$refs.ruleForm.validate((valid)=> {
+                    if (valid) {
+                        axios.post("/Customer/update",this.ruleForm).then((resp)=>{
+                            this.$message({
+                                message: resp.data.msg,
+                                type: 'success'
+                            });
+                            this.$forceUpdate()
+                        })
+                    }else {
+                        return false;
+                    }
+                })
+
+            }
+        }
+    })
+</script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="static/axios.js"></script>
+
+    <!--    https://unpkg.com/element-ui/lib/theme-chalk/index.css-->
+    <link rel="stylesheet" href="static/element_index.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+
+    <!-- 必须先引入vue，  后使用element-ui -->
+    <script src="static/vue.js"></script>
+    <!-- 引入element 的组件库-->
+
+    <!--  <script src="https://unpkg.com/element-ui/lib/index.js"></script>-->
+    <script src="static/Element_Index.js"></script>
+    <title>汽车销售系统</title>
+
+    <style>
+        .main{
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .upper{
+            float: left;
+            position: absolute;
+            z-index: 1;
+        }
+        .login-container {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: 300px;
+        }
+        .title {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        .upper{
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            text-align: left;
+            vertical-align: text-top;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 1rem;
+        }
+        .input-label {
+            margin-bottom: 0.5rem;
+        }
+        .input-group input {
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .login-btn {
+            padding: 0.5rem;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .register-btn {
+            padding: 0.5rem;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="upper">汽车销售管理系统</div>
+<div class="main">
+    <div class="login-container">
+        <div class="logo">
+            <img src="static/08a54522.jpg" alt="汽车销售系统" width="100" height="100"><br>
+        </div>
+        <h1 class="title">登录</h1>
+<!--       登录表单,用account来保存 -->
+        <form>
+            <div class="input-group">
+                <label class="input-label">用户名</label>
+                <input v-model="account.AccountName" placeholder="用户名" />
+            </div>
+            <div class="input-group">
+                <label class="input-label">密码</label>
+                <input v-model="account.Password" placeholder="密码"  type="password"/>
+            </div>
+            <el-button @click="login" type="primary" class="login-btn">登录</el-button>
+        </form>
+        <br>
+        <el-button @click="registBtn" type="primary" class="login-btn">注册</el-button>
+
+<!--        用来显示消息的提醒，根据需要调用dialogVisible-->
+        <el-dialog
+                title="提示"
+                :visible.sync="dialogVisible"
+                width="30%"
+                :before-close="handleClose">
+            <span>{{ msg }}</span>
+            <span slot="footer" class="dialog-footer">
+            <el-button @click="dialogVisible = false">取 消</el-button>
+            <el-button type="primary" @click="dialogVisible = false">确 定</el-button>
+            </span>
+        </el-dialog>
+
+<!--        注册表单，其中的用户类型详细表用drawer实现-->
+        <el-dialog
+                title="注册"
+                :visible.sync="formVisible"
+                width="30%"
+                :before-close="handleClose">
+
+            <el-form :model="ruleForm" status-icon :rules="rules" ref="ruleForm" label-width="100px" class="demo-ruleForm">
+                <el-form-item label="用户名" prop="AccountName">
+                    <el-input type="text" v-model="ruleForm.AccountName" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="密码" prop="pass">
+                    <el-input type="password" v-model="ruleForm.pass" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="确认密码" prop="checkPass">
+                    <el-input type="password" v-model="ruleForm.checkPass" autocomplete="off"></el-input>
+                </el-form-item>
+
+                <el-form-item label="用户类型">
+                    <el-radio-group v-model="typeRadio" @change="radioChange">
+                        <el-radio v-model="typeRadio" label="Customer">买家用户</el-radio>
+                        <el-radio v-model="typeRadio" label="Salesperson">销售用户</el-radio>
+                    </el-radio-group>
+                    <br>
+                    <el-button type="text" @click="drawerJudge" :disabled="drawerCliker">账号详细</el-button>
+                </el-form-item>
+
+                <el-form-item>
+                    <el-button type="primary" @click="regist()">提交</el-button>
+                    <el-button @click="formVisible = false">取消</el-button>
+                </el-form-item>
+            </el-form>
+
+
+        </el-dialog>
+
+<!--两种drawer-->
+        <el-drawer
+                title="买家用户账号详细填写"
+                :visible.sync="Customer_drawer"
+                :direction="direction"
+                :before-close="HandleClose"
+                :modal="true"
+                :modal-append-to-body="false"
+                :wrapper-closable="true">
+            <div class="demo-drawer__content">
+                <el-form :model="Customer" :rules="CustomerRules" ref="Customer">
+                    <el-form-item label="姓名" :label-width="drawerFormWidth" prop="Name">
+                        <el-input v-model="Customer.Name" autocomplete="off"></el-input>
+                    </el-form-item>
+                    <el-form-item label="电话号码" :label-width="drawerFormWidth" prop="Phone">
+                        <el-input v-model="Customer.Phone" autocomplete="off"></el-input>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="邮箱" :label-width="drawerFormWidth" prop="Email">
+                        <el-input v-model="Customer.Email" autocomplete="off"></el-input>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="地址" :label-width="drawerFormWidth" prop="Address">
+                        <el-input v-model="Customer.Address" autocomplete="off"></el-input>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="购买意向" :label-width="drawerFormWidth">
+                        <el-input v-model="Customer.Intent" autocomplete="off"></el-input>
+                        </el-select>
+                    </el-form-item>
+                </el-form>
+            </div>
+        </el-drawer>
+
+        <el-drawer
+                title="销售用户账号详细填写"
+                :visible.sync="Salesperson_drawer"
+                :direction="direction"
+                :before-close="HandleClose"
+                :modal="true"
+                :modal-append-to-body="false"
+                :wrapper-closable="true">
+            <div class="demo-drawer__content">
+                <el-form :model="Salesperson" :rules="SalespersonRules">
+                    <el-form-item label="姓名" :label-width="drawerFormWidth" prop="Name">
+                        <el-input v-model="Salesperson.Name" autocomplete="off"></el-input>
+                    </el-form-item>
+                    <el-form-item label="手机号码" :label-width="drawerFormWidth " prop="Phone">
+                        <el-input v-model="Salesperson.Phone" autocomplete="off"></el-input>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="团队编号" :label-width="drawerFormWidth" prop="Salesperson_group">
+                        <el-input v-model="Salesperson.Salesperson_group" autocomplete="off"></el-input>
+                        </el-select>
+                    </el-form-item>
+                </el-form>
+            </div>
+        </el-drawer>
+
+    </div>
+</div>
+<script>
+new Vue({
+    el:".login-container",
+    mounted(){
+        // 页面加载时提交post请求，用于重定向页面，如已登录的账户再次访问此页面，则跳转到主页
+        axios.post("/Account",this.account).then((res)=>{
+            if(res.data.code==20041){
+                let href = location.href
+                if(href.indexOf("/login.html")!=-1){
+                    location.href= res.data.data
+                }
+                else {
+                    location.reload()
+                }
+            }
+        });
+    },
+    data(){
+        var validateGroup=(rule, value ,callback) => {//通用的名字检查非空
+            if(value === ''){
+                callback(new Error('请输入已有的团队编号'));
+            }
+            callback()
+        }
+        var validateRealName=(rule, value ,callback) => {//通用的名字检查非空
+            if(value === ''){
+                callback(new Error('请输入姓名'));
+            }
+            callback()
+        }
+        var validateAddress=(rule, value ,callback) => {
+            if(value === ''){
+                callback(new Error('请输入地址'));
+            }
+            callback()
+        }
+        var validateEmail=(rule, value ,callback) => {
+            const reg2 =  /^([a-zA-Z0-9]+[|-|.]?)*[a-zA-Z0-9]+@([a-zA-Z0-9]+[|-|.]?)*[a-zA-Z0-9]+(.[a-zA-Z]{2,3})+$/;
+            if(value === ''){
+                callback(new Error('请输入邮箱'))
+            }else if (!reg2.test(value)){
+                callback(new Error('无效的邮箱'))
+            }
+            callback()
+        }
+        var validatePhone=(rule, value ,callback) => {
+            const reg2 =  /^1(3[0-9]|4[57]|5[0-35-9]|7[0678]|8[0-9])\d{8}$/;
+            if(value === ''){
+                callback(new Error('请输入手机号码'))
+            }else if (!reg2.test(value)){
+                callback(new Error('无效的号码'))
+            }
+            callback()
+        }
+        // 三个rules判断输入内容
+        var validateName=(rule, value ,callback) => {
+            const reg = new RegExp("[\u4e00-\u9fa5_a-zA-Z0-9]{4,20}")
+            const reg2 = /^[\u4e00-\u9fa5_a-zA-Z0-9]{4,20}$/
+            if(value === ''){
+                callback(new Error('请输入用户名'))
+            }else if (!reg2.test(value)){
+                callback(new Error('用户名为中文、英文或数字，且长度在4到20位之间'))
+            }
+            callback()
+        }
+        var validatePass = (rule, value, callback) => {
+            if (value === '') {
+                callback(new Error('请输入密码'));
+            } else {
+                if (this.ruleForm.checkPass !== '') {
+                    this.$refs.ruleForm.validateField('checkPass');
+                }
+                callback();
+            }
+        };
+        var validatePass2 = (rule, value, callback) => {
+            if (value === '') {
+                callback(new Error('请再次输入密码'));
+            } else if (value !== this.ruleForm.pass) {
+                callback(new Error('两次输入密码不一致!'));
+            } else {
+                callback();
+            }
+        };
+        return{
+            drawerFormWidth: '80px',
+          typeRadio: '1',
+          dialogVisible:false,
+          formVisible:false,
+            Customer_drawer: false,
+            Salesperson_drawer: false,
+            drawerCliker: true,
+            direction: 'ltr',
+            CustomerRules:{
+                Phone:[
+                    {validator: validatePhone, trigger: 'blur'}
+                ],
+                Email:[
+                    {validator: validateEmail, trigger: 'blur'}
+                ],
+                Address:[
+                    {validator: validateAddress, trigger: 'blur'}
+                ],
+                Name:[
+                    {validator: validateRealName, trigger: 'blur'}
+                ]
+            },
+            Customer:{
+                Name:'',
+                Phone:'',
+                Email:'',
+                Intent:'',
+                Address:''
+            },
+            SalespersonRules:{
+                Name:[
+                    {validator: validateRealName, trigger: 'blur'}
+                ],
+                Phone:[
+                    {validator: validatePhone, trigger: 'blur'}
+                ],
+                Salesperson_group:[
+                    {validator: validateGroup, trigger: 'blur'}
+                ],
+            },
+            Salesperson:{
+                Name: '',
+                Phone:'',
+                Target:'',
+                Salesperson_group:''
+            },
+            msg:"nihao",
+          account:{
+              Password: '',
+              AccountName:'',
+          },
+            ruleForm: {
+                AccountName: '',
+                pass: '',
+                checkPass: '',
+            },
+            rules: {
+                AccountName:[
+                    {validator: validateName, trigger: 'blur'}
+                ],
+                pass: [
+                    { validator: validatePass, trigger: 'blur' }
+                ],
+                checkPass: [
+                    { validator: validatePass2, trigger: 'blur' }
+                ]
+            },
+          registerForm: {
+                AccountName: '',
+                Password: '',
+                Type:''
+            }
+        };
+    },
+    methods:{
+        login(){
+            if (this.AccountName==''||this.password==''){
+                this.msg =this.account;
+            }else {
+                axios.post("/Account",this.account).then((res)=>{
+                    if(res.data.code==20041){
+                        let href = location.href
+                        if(href.indexOf("/login.html")!=-1){
+                            location.href= res.data.data
+                        }
+                        else {
+                            location.reload()
+                        }
+                    }
+                    else {
+                        this.msg=res.data.msg
+                        this.$message.error(this.msg)
+                    }
+                });
+            }
+        },
+        registBtn(){
+            this.formVisible=true;
+        },
+        regist(resp){
+            this.$refs.ruleForm.validate((valid)=>{
+                if (valid){
+                    if(this.typeRadio == '1'){
+                        this.$message.error("注册信息填写不全，请检查");
+                        return false;
+                    }
+                    else {
+                        if(this.typeRadio == 'Salesperson'){
+                            if (this.Salesperson.Name == '' || this.Salesperson.Phone==''|| this.Salesperson.Salesperson_group==''){
+                                this.$message.error("注册信息填写不全，请检查");
+                                return false;
+                            }
+                        }
+                        if(this.typeRadio == 'Customer'){
+                            if (this.Customer.Name == '' || this.Customer.Phone==''|| this.Customer.Email=='' || this.Customer.Address==''){
+                                this.$message.error("注册信息填写不全，请检查");
+                                return false;
+                            }
+                        }
+                    }
+
+
+                    let typeForm
+                    this.registerForm.AccountName=this.ruleForm.AccountName
+                    this.registerForm.Password=this.ruleForm.pass
+                    this.registerForm.Type = this.typeRadio
+                    if(this.typeRadio=='Customer'){
+                        typeForm = this.Customer
+                    }else if (this.typeRadio =='Salesperson'){
+                        typeForm = this.Salesperson
+                    }
+                    const myJSON = JSON.stringify(this.registerForm)
+                    const myJson2 = JSON.stringify(typeForm)
+                    const data = {
+                        "registerForm" : this.registerForm,
+                        "typeForm": typeForm
+                    }
+                    axios.post("/Account/register",data).then((res)=>{
+                        if(res.data.code==20011){
+                            let href = location.href
+                            if(href.indexOf("/login.html")!=-1){
+                                location.href= '/main.html'
+                            }
+                            else {
+                                location.reload()
+                            }
+                        }
+                        else {
+                            this.msg=res.data.msg
+                            this.$message.error(this.msg)
+                        }
+                    })
+                }else{
+                    return false
+                }
+            })
+
+        },
+        radioChange(){
+            this.drawerCliker=false
+            if(this.typeRadio == 'Customer'){
+                this.Customer_drawer=true
+            }
+            else if (this.typeRadio == 'Salesperson'){
+                this.Salesperson_drawer=true
+            }
+        },
+        HandleClose(done) {
+            this.$confirm('确认关闭？')
+                .then(_ => {
+                    done();
+                })
+                .catch(_ => {});
+        },
+        drawerJudge(){
+            if(this.typeRadio == 'Customer'){
+                this.Customer_drawer=true
+            }else if(this.typeRadio == 'Salesperson'){
+                this.Salesperson_drawer=true
+            }
+        }
+    }
+})
+</script>
+</body>
+</html>

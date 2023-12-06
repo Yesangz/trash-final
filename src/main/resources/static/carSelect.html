@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="static/axios.js"></script>
+
+    <!--    https://unpkg.com/element-ui/lib/theme-chalk/index.css-->
+    <link rel="stylesheet" href="static/element_index.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+
+    <!-- 必须先引入vue，  后使用element-ui -->
+    <script src="static/vue.js"></script>
+    <!-- 引入element 的组件库-->
+
+    <!--  <script src="https://unpkg.com/element-ui/lib/index.js"></script>-->
+    <script src="static/Element_Index.js"></script>
+    <title>frameTest</title>
+</head>
+<body>
+<div id="frameTest">
+    <h1 style="font-size:25px">车辆信息</h1>
+<!--    搜索栏-->
+    <el-form :inline="true" :model="queryForm" class="demo-form-inline">
+        <el-form-item label="汽车品牌" >
+            <el-select v-model="Brand"
+                       value-key="brandID"
+                       filterable clearable placeholder="请选择"
+                       @visible-change="selectBrands($event)"
+                       ref="delBrandValue"
+            >
+                <el-option
+                        v-for="item in Brands"
+                        :key="item.brandID"
+                        :label="item.brandName"
+                        :value="item.brandID">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="汽车型号">
+            <el-input v-model="QrModel" placeholder="汽车型号"></el-input>
+        </el-form-item>
+        <el-form-item label="价格">
+            <el-select v-model="QrPrice" filterable clearable placeholder="请选择" value-key="price">
+                <el-option
+                        v-for="item in options"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item>
+            <el-button type="primary" @click="ToselectByAttr">查询</el-button>
+            <el-button type="primary" @click="clearSelect">清空</el-button>
+            <el-button type="success" @click="handleAddCar()" :disabled="AddCarDisable">添加</el-button>
+        </el-form-item>
+    </el-form>
+
+<!--    主要内容-->
+    <el-main>
+        <el-table :data="tableData" @selection-change="handleSelectionChange">
+<!--            <el-table-column type="selection" align="center"></el-table-column>-->
+<!--            <el-table-column type="index" :index="indexMethod">-->
+            <el-table-column prop="Brand" label="汽车品牌" width="auto" align="center">
+            </el-table-column>
+            <el-table-column prop="Model" label="汽车型号" width="auto" align="center">
+            </el-table-column>
+            <el-table-column prop="Config" label="汽车配置" width="auto" align="center">
+            </el-table-column>
+            <el-table-column prop="Price" label="价格" width="auto" align="center">
+            </el-table-column>
+            <el-table-column prop="SalesState" label="是否可售" width="auto" align="center">
+                <template slot-scope="scope">
+                    {{scope.row.SalesState  | formatState}}
+                </template>
+            </el-table-column>
+            <el-table-column prop="Quantity" label="库存" width="auto" align="center"></el-table-column>
+            <el-table-column
+                    fixed="right"
+                    label="操作"
+                    width="100"
+                    align="center">
+                <template slot-scope="scope">
+                    <el-button @click="handleAdd(scope.row)" type="text" size="small">购买</el-button>
+                    <!--                            点击后出现订单界面-->
+<!--                    通过CarID、CustomerID、SalespersonID传到后端实现购买-->
+                    <el-button @click="handleDrop(scope.row)" type="text" size="small">删除</el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+
+<!--        车辆添加-->
+        <el-dialog
+            title="添加车辆"
+            :visible.sync="AddCarVisible"
+        >
+            <el-form :model="AddForm" :rules="AddRules" ref="AddForm">
+                <el-form-item label="汽车品牌" prop="BrandID">
+                    <el-select v-model="AddForm.BrandID"
+                               value-key="brandID"
+                               filterable clearable placeholder="请选择"
+                               @visible-change="selectBrands($event)"
+                               ref="delBrandValue"
+                    >
+                        <el-option
+                                v-for="item in Brands"
+                                :key="item.brandID"
+                                :label="item.brandName"
+                                :value="item.brandID">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="汽车型号" prop="Model">
+                    <el-input v-model="AddForm.Model" placeholder="汽车型号"></el-input>
+                </el-form-item>
+                <el-form-item label="汽车配置" prop="Config">
+                    <el-input v-model="AddForm.Config" placeholder="汽车配置"></el-input>
+                </el-form-item>
+                <el-form-item label="价格" prop="Price">
+                    <el-input v-model="AddForm.Price" placeholder="价格/万元"></el-input>
+                </el-form-item>
+                <el-form-item label="是否可售">
+                    <el-radio v-model="AddForm.SalesState" label="1">是</el-radio>
+                    <el-radio v-model="AddForm.SalesState" label="0">否</el-radio>
+                </el-form-item>
+                <el-form-item label="库存" prop="Quantity">
+                    <el-input v-model="AddForm.Quantity" placeholder="库存"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button @click="AddCar" type="primary" size="medium">添加</el-button>
+                    <el-button @click="AddCarVisible = false" size="medium">取消</el-button>
+                </el-form-item>
+            </el-form>
+        </el-dialog>
+
+<!--        车辆删除确认-->
+        <el-dialog
+                title="警告"
+                :visible.sync="DropWarnVisible"
+        >
+            <span>是否确认删除该车辆？</span><br><br>
+            <el-button @click="dropBrand" type="danger">确定</el-button>
+            <el-button @click="DropWarnVisible = false">取消</el-button>
+        </el-dialog>
+
+        <el-dialog
+                title="支付界面"
+                :visible.sync="BuyVisible"
+        >
+            <el-form>
+                <el-form-item label="是否指定销售人员">
+                    <el-radio-group v-model="salespersonRadio">
+                        <el-radio v-model="salespersonRadio" :label=false>是</el-radio>
+                        <el-radio v-model="salespersonRadio" :label=true>否</el-radio>
+                    </el-radio-group>
+                    <br>
+                </el-form-item>
+                <el-form-item label="销售人员编号">
+                    <el-input v-model="salespersonBuy" :disabled="salespersonRadio" placeholder="指定销售人员编号"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button @click="ConfirmBuy">确认购买</el-button>
+                </el-form-item>
+            </el-form>
+        </el-dialog>
+
+    </el-main>
+    <el-pagination
+            background
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            :current-page="currentPage"
+            :page-sizes="[5, 10, 15, 20]"
+            :page-size="pageSize"
+            layout="total, sizes, prev, pager, next, jumper"
+    >
+    </el-pagination>
+</div>
+
+<script>
+    new Vue({
+        el: '#frameTest',
+        mounted(){
+            axios.get("/Car/getCars",{
+                params: {
+                    pageSize: this.pageSize,
+                    currentPage: this.currentPage
+                }
+            }).then((resp)=>{
+                this.tableData=resp.data.data;
+            })
+            // 前端权限判断
+            axios.get("/Account").then((resp)=>{
+                this.accountType =resp.data.data.Type
+                if(this.accountType == 'Customer'){
+                    this.BrandManageDisable=true;
+                }else if (this.accountType == 'Salesperson'){
+                    this.BrandManageDisable=true;
+                }else if(this.accountType == 'Admin' || this.accountType=='Supplier'){
+                    this.BrandManageDisable=false;
+                    this.AddCarDisable = false;
+                }
+            })
+        },
+        filters:{
+            formatState(val){
+                return val==0 ? '否':'是'
+            }
+        },
+        data() {
+            const item = {
+                Brand: "奔驰",
+                Model: "A",
+                Price: "20w",
+                SalesState: "是"
+            };
+            var validateModel=(AddRules, value ,callback) => {
+                if(value === ''){
+                    callback(new Error('不能为空'))
+                }
+                callback()
+            };
+            var validateConfig=(AddRules, value ,callback) => {
+                if(value === ''){
+                    callback(new Error('不能为空'))
+                }
+                callback()
+            };
+            var validatePrice=(AddRules, value ,callback) => {
+                if(value === ''){
+                    callback(new Error('不能为空'))
+                }
+                callback()
+            };
+            var validateQuantity=(AddRules, value ,callback) => {
+                if(value === ''){
+                    callback(new Error('不能为空'))
+                }
+                callback()
+            };
+            var validateBrandID=(AddRules, value ,callback) => {
+                if(value === ''){
+                    callback(new Error('不能为空'))
+                }
+                callback()
+            };
+            return {
+                //添加模块
+                AddRules:{
+                    BrandID:[
+                        {validator: validateBrandID, trigger: 'change'}
+                    ],
+                    Model: [
+                        { validator: validateModel, trigger: 'blur' }
+                    ],
+                    Config: [
+                        { validator: validateConfig, trigger: 'blur' }
+                    ],
+                    Price: [
+                        { validator: validatePrice, trigger: 'blur' }
+                    ],
+                    Quantity: [
+                        { validator: validateQuantity, trigger: 'blur' }
+                    ]
+                },
+                AddForm:{
+                    BrandID:'',
+                    Model:'',
+                    Config:'',
+                    Price:'',
+                    Quantity: '',
+                    SalesState:''
+                },
+                AddCarDisable:true,
+                AddCarVisible: false,
+                //购买与删除模块
+                DropWarnVisible:false,
+                BuyVisible:false,
+                //查询模块
+                QrModel:'',
+                QrPrice:'',
+                multipleSelection:[],
+                totalUser: 0,
+                currentPage:1,
+                pageSize: 5,
+                opinionFeedBack: '123',
+                feedbackVisible:false,
+                tableData: [{
+                    Brand: "奔驰",
+                    Model: "A",
+                    Config:'1',
+                    Price: "20w",
+                    Quantity:20,
+                    SalesState: "是"
+                },
+                ],
+                QrBrand: '',
+                QrModel: '',
+                queryForm:{},
+                options: [{
+                    price:{
+                        lPrice: 1,
+                        hPrice: 20
+                    },
+                    value: '选项1',
+                    label: '1~20W'
+                }, {
+                    price:{
+                        lPrice: 20,
+                        hPrice: 40
+                    },
+                    value: '选项2',
+                    label: '20~40W'
+                }, {
+                    price: {
+                        lPrice: 40,
+                        hPrice: 60
+                    },
+                    value: '选项3',
+                    label: '40~60W'
+                }, {
+                    price: {
+                        lPrice: 60,
+                        hPrice: 80
+                    },
+                    value: '选项4',
+                    label: '60~80W'
+                }, {
+                    price: {
+                        lPrice: 80,
+                        hPrice: 100
+                    },
+                    value: '选项5',
+                    label: '80~100W'
+                },{
+                    price: {
+                        lPrice: 100,
+                        hPrice: null
+                    },
+                    value: '选项6',
+                    label: '100W+'
+                }
+                ],
+                Brands:[{
+                    brandID:0,
+                    brandName:'奔驰'
+                }],
+                accountType:'',
+                salespersonBuy:'',
+                salespersonRadio:false,
+                Brand:'',
+                value: '',
+                tmp:'',
+                dropTmp:null//用来存放选项的临时值
+            }
+        },
+        methods:{
+            handleAddCar(){
+                if(this.accountType == 'Admin' || this.accountType=='Supplier'){
+                    this.AddCarVisible = true;
+                }else {
+                    this.$message.error("该用户类型不支持该操作");
+                }
+            },
+            AddCar(){
+                this.$refs.AddForm.validate((valid)=>{
+                    if (valid){
+                        axios.post("/Car/add",this.AddForm).then((resp)=>{
+                            if (resp.data.code=20011){
+                                this.$message({
+                                    message:resp.data.msg,
+                                    type:'success'
+                                })
+                                this.selectByAttr();
+                            }else {
+                                this.$message.error(resp.data.msg);
+                            }
+                        })
+                        this.AddCarVisible=false;
+                    }else {
+                        return false;
+                    }
+                    this.selectByAttr();
+                })
+
+            },
+            dropBrand(){
+              if(this.dropTmp == null){
+                  this.$message.error("车辆不存在");
+              }
+              else {
+                  axios.post("/Car/drop",{
+                      CarID: this.dropTmp.CarID
+                  }).then((resp)=>{
+                      if(resp.data.code == 20021){
+                          this.$message({
+                              message:'车辆删除成功',
+                              type: 'success'
+                          })
+                          this.selectByAttr();
+                      }else {
+                          this.$message.error('车辆删除失败');
+                      }
+                  })
+                  this.DropWarnVisible=false;
+                  this.selectByAttr();
+              }
+            },
+            handleDrop(row){
+                if(this.accountType == 'Supplier' || this.accountType == 'Admin'){
+                    this.dropTmp = row;
+                    this.DropWarnVisible = true;
+                }else {
+                    this.$message.error('该用户类型不支持该操作');
+                }
+            },
+            clearSelect(resp){
+                axios.get("/Car/getCars",{
+                    params: {
+                        pageSize: this.pageSize,
+                        currentPage: this.currentPage
+                    }
+                }).then((resp)=>{
+                    this.tableData=resp.data.data
+                    this.QrPrice=null;
+                    this.Brand=null;
+                    this.QrModel='';
+                    this.$forceUpdate()
+                })
+            },
+            ToselectByAttr(){
+                this.currentPage=1;
+              this.selectByAttr();
+            },
+            selectByAttr(){
+                this.$forceUpdate()
+                let tmp_lprice
+                let tmp_hprice
+                // 因为传入一个null值会导致报错，因此用空字符串代替
+                if(this.QrPrice== null || this.QrPrice == ''){
+                    tmp_lprice=''
+                    tmp_hprice=''
+                }
+                else {
+                    tmp_lprice=this.QrPrice.price.lPrice
+                    tmp_hprice=this.QrPrice.price.hPrice
+                }
+                axios.post("/Car/selectCars",{
+                    brandID:this.Brand,
+                    model:this.QrModel,
+                    hPrice:tmp_hprice,
+                    lPrice:tmp_lprice,
+                    pageSize:this.pageSize,
+                    currentPage:this.currentPage
+                }).then((resp)=>{
+                    this.tableData=resp.data.data
+                })
+            },
+            selectBrands(callback){
+                if(callback){
+                    axios.get("/Car/getBrands").then((resp)=>{
+                        // const data = JSON.stringify(resp.data.data);
+                        this.Brands = resp.data.data
+                    })
+                }
+            },
+            handleSelectionChange(val) {
+                this.multipleSelection = val;
+            },
+            indexMethod(index) {
+                return (this.currentPage * this.pageSize)-(this.pageSize - (index+1));
+            },
+            // 处理更改每页显示条数操作
+            handleSizeChange(val) {
+                this.pageSize=val
+                this.selectByAttr();
+            },
+            // 处理当前换页操作
+            handleCurrentChange(val) {
+                this.currentPage=val
+                this.selectByAttr();
+            },
+
+            handleAdd(row){
+                if(this.accountType == 'Customer') {
+                    this.tmp=row
+                    this.BuyVisible = true
+                    this.selectByAttr();
+                }else {
+                    this.$message.error("该账户类型不支持此操作")
+                }
+            },
+            ConfirmBuy() {
+                    axios.post("/Car/buy",{
+                        CarID:this.tmp.CarID,
+                        SalespersonID:this.salespersonBuy
+                    }).then((resp)=>{
+                        if(resp.data.code==20011){
+                            this.$message({
+                                message: resp.data.msg,
+                                type: 'success'
+                            });
+                            this.selectByAttr();
+                        }else {
+                            this.$message.error(resp.data.msg+"，请检查信息填写是否正确")
+                        }
+                    })
+                this.BuyVisible=false;
+            }
+        }
+    })
+</script>
+</body>
+</html>

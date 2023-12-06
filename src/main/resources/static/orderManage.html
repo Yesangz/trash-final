@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="static/axios.js"></script>
+
+    <!--    https://unpkg.com/element-ui/lib/theme-chalk/index.css-->
+    <link rel="stylesheet" href="static/element_index.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+
+    <!-- 必须先引入vue，  后使用element-ui -->
+    <script src="static/vue.js"></script>
+    <!-- 引入element 的组件库-->
+
+    <!--  <script src="https://unpkg.com/element-ui/lib/index.js"></script>-->
+    <script src="static/Element_Index.js"></script>
+
+  <title>OrderManagement</title>
+</head>
+<body>
+<!--总布局-->
+<div id="OrderManagement">
+<!--  订单界面-->
+  <h1 style="font-size:25px">订单管理</h1>
+  <el-form :inline="true" v-model="queryForm" class="demo-form-inline">
+    <el-form-item label="订单号" >
+      <!--      待输入，订单编号查询-->
+      <el-input v-model="queryForm.RecordID" placeholder="订单号"></el-input>
+    </el-form-item>
+    <el-form-item label="用户编号">
+      <el-input v-model="queryForm.CustomerID" placeholder="用户编号" :disabled="CustomerIdDisable"></el-input>
+    </el-form-item>
+    <el-form-item label="销售编号">
+      <el-input v-model="queryForm.SalespersonID" placeholder="销售ID" :disabled="SalespersonIdDisable"></el-input>
+      </el-select>
+    </el-form-item>
+    <el-form-item label="汽车编号">
+      <el-input v-model="queryForm.CarID" placeholder="汽车ID"></el-input>
+    </el-form-item>
+<!--    返回的是ISO 8601格式的时间字符串，要用ZoneDatetime来转换为date
+        并且返回的是数组，用date[0]下标0表示开始日期。date[1]下标1表示结束日期
+-->
+    <el-form-item label="日期">
+      <div class="block">
+        <el-date-picker
+                v-model="queryForm.SalesDate"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期">
+        </el-date-picker>
+      </div>
+    </el-form-item>
+    <el-form-item label="价格区间">
+      <div class="priceRange"  style="width: 100px" aria-label="最低价格">
+        <el-input v-model="priceRange.lowPrice" placeholder="最低价格"></el-input>
+      </div>
+    </el-form-item>
+    <el-form-item>
+      <div class="priceRange"  style="width: 100px" aria-label="最高价格">
+        <el-input v-model="priceRange.highPrice" placeholder="最高价格"></el-input>
+      </div>
+    </el-form-item>
+    <el-form-item label="销售状态">
+<!--        <el-input v-model="queryForm.SalesState" placeholder="销售状态"></el-input>-->
+      <el-select v-model="queryForm.OrderState" filterable clearable placeholder="请选择" ref="delPriceValue">
+        <el-option
+                v-for="item in StateOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
+        </el-option>
+      </el-select>
+    </el-form-item>
+    <el-form-item>
+      <el-button type="primary" @click="selectByAttr">查询</el-button>
+      <el-button type="primary" @click="clearSelect(queryForm.SalesDate)">清空</el-button>
+    </el-form-item>
+  </el-form>
+  <el-form>
+  </el-form>
+
+<!--  订单信息表-->
+  <el-main>
+    <el-table :data="tableData" @selection-change="handleSelectionChange">
+<!--      <el-table-column type="selection" align="center"></el-table-column>-->
+<!--      <el-table-column type="index" :index="indexMethod"></el-table-column>-->
+      <el-table-column prop="RecordID" label="订单编号" width="250" align="center"></el-table-column>
+      <el-table-column prop="CarID" label="车辆编号" width="250" align="center"></el-table-column>
+      <el-table-column prop="SalesPrice" label="价格/万元" width="250" align="center"></el-table-column>
+      <el-table-column prop="OrderState" label="销售状态" width="250" align="center"></el-table-column>
+      <el-table-column prop="SalesDate" label="销售时间" width="250" align="center"></el-table-column>
+      <el-table-column
+              fixed="right"
+              label="操作"
+              width="auto"
+              align="center">
+        <template slot-scope="scope">
+          <el-button @click="handleEdit(scope.row)" type="text" size="medium">修改</el-button>
+<!--          只有销售以上的权限才能修改，销售状态、价格、销售编号，当订单废除时，库存恢复+1-->
+          <!--                            点击后出现订单界面-->
+          <el-button @click="OrderDetails(scope.row)" type="text" size="medium">详细</el-button>
+<!--          车辆品牌、车辆型号、车辆配置、价格、销售日期、买家姓名、买家电话、销售姓名、销售电话-->
+            <el-button @click="cancelWarning(scope.row)" type="text" style="color: red">取消订单</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+      <el-dialog
+            title="警告"
+            :visible.sync="WarningVisible"
+            width="30%"
+      >
+            <span>是否确认取消订单？</span><br><br>
+          <el-button @click="SubmitCancel" type="danger">确定</el-button>
+          <el-button @click="WarningVisible = false">取消</el-button>
+      </el-dialog>
+
+<!--      修改界面-->
+    <el-dialog
+        title="订单修改"
+        :visible.sync="EditVisible"
+    >
+        <el-form :model="editForm"  ref="ruleForm" label-width="100px" class="demo-ruleForm">
+            <el-form-item label="销售人员编号" prop="SalespersonID">
+                <el-input type="text" v-model="editForm.SalespersonID" autocomplete="off"></el-input>
+            </el-form-item>
+            <el-form-item label="销售价格" prop="SalesPrice">
+                <el-input type="text" v-model="editForm.SalesPrice" autocomplete="off"></el-input>
+            </el-form-item>
+            <el-form-item label="销售状态">
+                <!--        <el-input v-model="queryForm.SalesState" placeholder="销售状态"></el-input>-->
+                <el-select v-model="editForm.OrderState" filterable clearable placeholder="请选择" ref="delPriceValue">
+                    <el-option
+                            v-for="item in StateOptions"
+                            :key="item.value"
+                            :label="item.label"
+                            :value="item.value">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+
+            <el-form-item>
+                <el-button type="primary" @click="SubmitEdit">提交</el-button>
+                <el-button @click="EditVisible = false">取消</el-button>
+            </el-form-item>
+        </el-form>
+    </el-dialog>
+
+<!--    详细界面-->
+    <el-dialog
+        title="订单详细"
+        :visible.sync="DetailVisible"
+    >
+        <el-form label-position="left" inline class="demo-table-expand">
+          <el-form-item label="车辆品牌">
+            <span>{{ detailForm.Brand }}</span>
+          </el-form-item>
+          <el-form-item label="车辆型号">
+            <span>{{ detailForm.Model }}</span>
+          </el-form-item>
+          <el-form-item label="车辆配置">
+            <span>{{ detailForm.Config }}</span>
+          </el-form-item>
+          <el-form-item label="买家姓名">
+            <span>{{ detailForm.CustomerName }}</span>
+          </el-form-item>
+          <el-form-item label="买家电话">
+            <span>{{ detailForm.CustomerPhone }}</span>
+          </el-form-item>
+          <el-form-item label="销售姓名">
+            <span>{{ detailForm.SalespersonName }}</span>
+          </el-form-item>
+          <el-form-item label="销售电话">
+            <span>{{ detailForm.SalespersonPhone }}</span>
+          </el-form-item>
+          <el-form-item label="销售日期">
+            <span>{{ detailForm.SalesDate }}</span>
+          </el-form-item>
+          <el-form-item label="价格">
+            <span>{{ detailForm.SalesPrice }}万</span>
+          </el-form-item>
+        </el-form>
+
+      </el-form>
+    </el-dialog>
+
+<!--分页功能-->
+  </el-main>
+  <el-pagination
+          background
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+          :current-page="currentPage"
+          :page-sizes="[5, 10, 15, 20]"
+          :page-size="pageSize"
+          layout="total, sizes, prev, pager, next, jumper"
+  >
+  </el-pagination>
+</div>
+
+<script>
+  new Vue({
+    el: '#OrderManagement',
+    mounted(){
+      // 获取订单
+      this.selectForCall()
+      // 获取账户类型
+      axios.get("/Account").then((resp)=>{
+        this.accountType = resp.data.data.Type
+        if(this.accountType == 'Customer'){
+          this.CustomerIdDisable=true
+        }
+        else if (this.accountType == 'Salesperson'){
+          this.SalespersonIdDisable=true
+        }
+      })
+    },
+    filters:{
+      formatState(val){
+        return val==0 ? '否':'是'
+      }
+    },
+    data() {
+      return {
+        WarningVisible:false,
+        EditVisible:false,
+        DetailVisible: false,
+        CustomerIdDisable:false,
+        SalespersonIdDisable:false,
+        accountType:'',
+        StateOptions:[
+          {
+            label:'待接收',
+            value: '待接收'
+          },
+          {
+            label:'已接收',
+            value: '已接收'
+          },
+          {
+            label:'车辆已准备',
+            value: '车辆已准备'
+          },
+          {
+            label:'待交车',
+            value: '待交车'
+          },
+          {
+            label:'订单完成',
+            value: '订单完成'
+          },
+          {
+            label:'订单废除',
+            value: '订单废除'
+          },
+        ],
+        tableData:[{
+          RecordID:'0',
+          CarID:'1',
+          SalesPrice:100,
+          OrderState:'订单完成',
+          SalesDate:'2023-11-21'
+        }],
+        multipleSelection:[],
+        totalUser: 0,
+        currentPage:1,
+        pageSize: 5,
+        opinionFeedBack: '123',
+        feedbackVisible:false,
+        queryForm:{
+          RecordID:'',
+          CustomerID:'',
+          CarID:'',
+          SalespersonID:'',
+          SalesDate:'',
+          SalesPrice:'',
+          OrderState:''
+        },
+        dateRange:{
+          earlyDate:'',
+          lateDate:''
+        },
+        priceRange:{
+          lowPrice:'',
+          highPrice:''
+        },
+        editForm:{
+            RecordID:'',
+            CarID:'',
+            OrderState:'',
+            SalesPrice:'',
+            SalespersonID:''
+        },
+        detailForm:{
+          Brand:'',
+          Model:'',
+          Config:'',
+          SalesPrice:'',
+          SalesDate:'',
+          OrderState:'',
+          CustomerName:'',
+          CustomerPhone:'',
+          SalespersonName:'',
+          SalespersonPhone:''
+        },
+        tmp:null,
+        value: ''
+      }
+    },
+    methods:{
+        SubmitCancel(){
+            if(this.tmp.OrderState != '待接收'){
+                this.$message.error('非待接收的订单无法取消，请联系销售人员');
+            }
+            else {
+                this.tmp.OrderState='订单废除';
+                axios.post("/Orders/edit",this.tmp).then((resp)=>{
+                    if(resp.data.code == 20011){
+                        this.$message("订单取消成功");
+                    }else {
+                        this.$message("订单取消失败");
+                    }
+                })
+            }
+            this.WarningVisible=false;
+        },
+      cancelWarning(row){
+        if(row.OrderState == '订单废除'){
+            this.$message.error('已废除的订单无法再次取消');
+        }else {
+            this.tmp = row;
+            this.WarningVisible = true;
+        }
+      },
+      OrderDetails(row){
+        axios.get("/Orders/detail",{
+          params: {
+            RecordID:row.RecordID
+          }
+        }).then((resp)=>{
+          this.detailForm.Brand=resp.data.data.Brand
+          this.detailForm.Model=resp.data.data.Model
+          this.detailForm.Config=resp.data.data.Config
+          this.detailForm.SalesPrice=resp.data.data.SalesPrice
+          this.detailForm.SalesDate=resp.data.data.SalesDate
+          this.detailForm.OrderState=resp.data.data.OrderState
+          this.detailForm.CustomerName=resp.data.data.CustomerName
+          this.detailForm.CustomerPhone=resp.data.data.CustomerPhone
+          this.detailForm.SalespersonName=resp.data.data.SalespersonName
+          this.detailForm.SalespersonPhone=resp.data.data.SalespersonPhone
+
+          this.DetailVisible=true
+        })
+      },
+      clearSelect(resp){
+        this.currentPage=1
+        //清空输入框
+        this.queryForm.SalesDate = ''
+        this.queryForm.CarID=''
+        this.queryForm.SalesPrice=''
+        this.queryForm.SalespersonID=''
+        this.queryForm.CustomerID=''
+        this.queryForm.OrderState=''
+        this.queryForm.RecordID=''
+        this.queryForm.SalesDate=''
+        // 清空选择框
+        this.priceRange.lowPrice=''
+        this.priceRange.highPrice=''
+        this.dateRange.lateDate=''
+        this.dateRange.earlyDate=''
+
+        this.dateRange.lateDate = this.queryForm.SalesDate[1]
+        this.dateRange.earlyDate = this.queryForm.SalesDate[0]
+        this.queryForm.SalesDate=''
+
+        this.selectForCall()
+        this.$message({
+          message: "已清空",
+          type: 'success'
+        });
+
+      },
+      selectForCall(){
+        this.dateRange.lateDate = this.queryForm.SalesDate[1]
+        this.dateRange.earlyDate = this.queryForm.SalesDate[0]
+        this.queryForm.SalesDate=''
+        axios.post("/Orders/selectOrders",{
+          order:this.queryForm,
+          highPrice: this.priceRange.highPrice,
+          lowPrice: this.priceRange.lowPrice,
+          earlyDate: this.dateRange.earlyDate,
+          lateDate: this.dateRange.lateDate,
+          pageSize:this.pageSize,
+          currentPage:this.currentPage
+        }).then((resp)=>{
+          this.tableData=resp.data.data
+          this.queryForm.SalesDate = this.dateRange
+        })
+      },
+      selectByAttr(resp){
+        this.currentPage=1
+        this.dateRange.lateDate = this.queryForm.SalesDate[1]
+        this.dateRange.earlyDate = this.queryForm.SalesDate[0]
+        this.queryForm.SalesDate=''
+        axios.post("/Orders/selectOrders",{
+          order:this.queryForm,
+          highPrice: this.priceRange.highPrice,
+          lowPrice: this.priceRange.lowPrice,
+          earlyDate: this.dateRange.earlyDate,
+          lateDate: this.dateRange.lateDate,
+          pageSize:this.pageSize,
+          currentPage:this.currentPage
+        }).then((resp)=>{
+          this.tableData=resp.data.data
+          this.queryForm.SalesDate = this.dateRange
+          this.$message({
+            message: resp.data.msg,
+            type: 'success'
+          });
+        })
+      },
+      selectBrands(callback){
+        if(callback){
+          axios.get("/Car/getBrands").then((resp)=>{
+            // const data = JSON.stringify(resp.data.data);
+            this.Brands = resp.data.data
+          })
+        }
+      },
+      handleSelectionChange(val) {
+        this.multipleSelection = val;
+      },
+      indexMethod(index) {
+        return (this.currentPage * this.pageSize)-(this.pageSize - (index+1));
+      },
+      handleSizeChange(val) {
+        this.pageSize=val
+        axios.get("/Orders",{
+          params:{
+            pageSize: this.pageSize,
+            currentPage: this.currentPage
+          }
+        }).then((resp)=>{
+          this.tableData=resp.data.data
+        })
+      },
+      handleCurrentChange(val) {
+        this.currentPage=val
+        this.selectForCall()
+      },
+      SubmitEdit(){
+          this.editForm.RecordID = this.tmp.RecordID
+          this.editForm.CarID = this.tmp.CarID
+          axios.post("/Orders/edit",this.editForm).then((resp)=>{
+              if (resp.data.code == 20011){
+                  this.$message({
+                      message: resp.data.msg,
+                      type: 'success'
+                  });
+                  this.EditVisible=false;
+                  this.selectForCall();
+              }
+              else {
+                  this.$message.error(resp.data.msg)
+              }
+          })
+      },
+      handleEdit(row) {
+          if (this.accountType == 'Customer'){
+              this.$message.error('该用户类型无法进行此操作')
+          }
+          else {
+              axios.get("/Orders/getOne",{
+                  params:{
+                      RecordID:row.RecordID
+                  }
+              }).then((resp)=>{
+                  if(resp.data.code == 20040){
+                      this.$message.error('该用户类型无法进行此操作')
+                  }
+                  else {
+                      this.editForm.OrderState = resp.data.data.OrderState
+                      this.editForm.SalesPrice = resp.data.data.SalesPrice
+                      this.editForm.SalespersonID = resp.data.data.SalespersonID
+                      this.tmp=row
+                      this.EditVisible = true
+                  }
+              })
+          }
+      }
+    }
+  })
+</script>
+
+<style>
+  .demo-table-expand {
+    font-size: 0;
+  }
+  .demo-table-expand label {
+    width: 90px;
+    color: #99a9bf;
+  }
+  .demo-table-expand .el-form-item {
+    margin-right: 0;
+    margin-bottom: 0;
+    width: 50%;
+  }
+</style>
+
+</body>
+</html>

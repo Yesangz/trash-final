@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="static/axios.js"></script>
+
+    <!--    https://unpkg.com/element-ui/lib/theme-chalk/index.css-->
+    <link rel="stylesheet" href="static/element_index.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+
+    <!-- 必须先引入vue，  后使用element-ui -->
+    <script src="static/vue.js"></script>
+    <!-- 引入element 的组件库-->
+
+    <!--  <script src="https://unpkg.com/element-ui/lib/index.js"></script>-->
+    <script src="static/Element_Index.js"></script>
+    <title>意见反馈</title>
+</head>
+<body>
+<div id="main">
+    <template>
+        <el-table
+                :data="tableData"
+                style="width: 100%"
+                border
+        >
+            <el-table-column
+                    prop="AccountID"
+                    label="账号来源"
+                    width="auto">
+            </el-table-column>
+            <el-table-column
+                    prop="content"
+                    label="内容"
+                    width="auto">
+            </el-table-column>
+            <el-table-column
+                label="操作"
+            >
+                <template slot-scope="scope">
+                    <el-button @click="Visible=true;tmp = scope.row" type="text" size="small">删除</el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+    </template>
+
+    <el-dialog
+            title="警告"
+            :visible.sync="Visible"
+            width="30%"
+    >
+        <span>是否确认删除该反馈？</span><br><br>
+        <el-button @click="dropFeedback" type="danger">确定</el-button>
+        <el-button @click="Visible = false">取消</el-button>
+    </el-dialog>
+
+</div>
+
+<script>
+  new Vue({
+   el:'#main',
+   mounted(){
+        axios.get("/feedback/content").then((resp)=>{
+            this.tableData = resp.data.data;
+        })
+   } ,
+    data(){
+       return{
+           tmp:null,
+           Visible:false,
+           tableData:[{
+               AccountID:1,
+               content:'内容1'},
+           ],
+       }
+    },
+    methods:{
+        dropFeedback(){
+            axios.post("/feedback/drop",this.tmp).then((resp)=>{
+                if(resp.data.code == 20021){
+                    this.$message({
+                        message:resp.data.msg,
+                        type:'success'
+                    });
+                    this.Visible=false;
+                    axios.get("/feedback/content").then((resp)=>{
+                        this.tableData = resp.data.data;
+                    })
+                }else {
+                    this.$message.error(resp.data.msg);
+                }
+            })
+        }
+    }
+  })
+</script>
+</body>
+</html>
